@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
     "port": "COM3",
     "board": "arduino:avr:uno",
     "programmer": "arduino:avrisp"
+=======
+    "port": "/dev/ttyACM0"
+>>>>>>> 0ab6a16201462bc7154c7cfb10ce18dedd5338ed
 }
