@@ -4,32 +4,21 @@
 */
 
 #include "WiFiS3.h"
-#include "./arduino_secrets/arduino_secrets.h" 
+#include "wifi.h"
 
-char ssid[] = SECRET_SSID;  // your network SSID (name)
-char pass[] = SECRET_PASS;  // network password
-int led =  LED_BUILTIN;
 int status = WL_IDLE_STATUS;
-WiFiServer server(80);
-
-void setup() {
-  Serial.begin(115200);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
   Serial.println("Access Point Web Server");
-
-  pinMode(led, OUTPUT);      // set the LED pin mode
-
+void setupAP(const char ssid[], const char pass[],
+             int ip1, int ip2, int ip3, int ip4,
+             WiFiServer &server) {
   // check for the WiFi module:
   if (WiFi.status() == WL_NO_MODULE) {
     Serial.println("Communication with WiFi module failed!");
     // don't continue
     while (true);
   }
-
-  WiFi.config(IPAddress(192,168,4,1));
-
+  WiFi.config(IPAddress(ip1, ip2, ip3, ip4));
+  
   // print the network name (SSID);
   Serial.print("Creating access point named: ");
   Serial.println(ssid);
@@ -39,7 +28,7 @@ void setup() {
     Serial.println("Creating access point failed");
     while (true);
   }
-
+  Serial.println("Waiting 2 seconds for connection...");
   // wait 10 seconds for connection:
   delay(2000);
   // start the web server on port 80
@@ -49,8 +38,8 @@ void setup() {
 }
 
 
-void loop() {
-  
+
+/*  
   // compare the previous status to the current status
   if (status != WiFi.status()) {
     status = WiFi.status();
@@ -105,7 +94,8 @@ void loop() {
     client.stop();
     Serial.println("client disconnected");
   }
-}
+
+*/
 
 void printWiFiStatus() {
   // print the SSID of the network you're attached to:

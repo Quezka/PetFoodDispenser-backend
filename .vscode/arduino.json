@@ -1,5 +1,5 @@
 {
-    "port": "COM3",
+    "port": "/dev/ttyACM0",
     "board": "arduino:renesas_uno:unor4wifi",
-    "sketch": "foodDispenser.ino"
+    "sketch": "PetFoodDispenser-backend.ino"
 }
