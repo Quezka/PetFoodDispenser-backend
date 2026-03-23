@@ -1,5 +1,5 @@
 # VSCode
-.vscode/
+.vscode/*
 *.code-workspace
 
 # Arduino build artifacts
