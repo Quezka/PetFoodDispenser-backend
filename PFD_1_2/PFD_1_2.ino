@@ -405,9 +405,8 @@ if (cr3!=cr3_old)
     }
  }
  }
-//Definizione della funzione confronti
 
-
+// Definizione delle funzioni confronti per commutatori rotativi singoli
 void confronti_sw1(int lettura){
   if (lettura>pos5){
 
@@ -461,7 +460,6 @@ void confronti_sw1(int lettura){
   }
 }
 
-
 void confronti_sw2(int lettura){
   if (lettura>pos5){
     tempo=5; //12;
@@ -505,7 +503,6 @@ void confronti_sw2(int lettura){
   }
 }
 
-
 void confronti_sw3(int lettura){
   if (lettura>pos5){
     QMA=1;
@@ -546,5 +543,3 @@ void confronti_sw3(int lettura){
     return;//esce dalla funzione confronti
   }
 }
-
-
