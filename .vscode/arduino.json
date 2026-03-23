@@ -1,6 +1,5 @@
 {
     "port": "COM3",
     "board": "arduino:renesas_uno:unor4wifi",
-    "programmer": "arduino:avrisp",
     "sketch": "foodDispenser.ino"
 }
