@@ -4,14 +4,15 @@
 */
 
 #include "WiFiS3.h"
-#include "./arduino_secrets/arduino_secrets.h" 
-#include ".wifi/wifi.h"
+#include "arduino_secrets.h" 
+#include "wifi.h"
 
 char ssid[] = SECRET_SSID;  // your network SSID (name)
 char pass[] = SECRET_PASS;  // network password
 int led =  LED_BUILTIN;
 int status = WL_IDLE_STATUS;
 WiFiServer server(80);
+WiFiClient client;
 
 void setup() {
   Serial.begin(115200);
@@ -27,6 +28,6 @@ void setup() {
 
 
 void loop() {
- 
+ wifiLoop(status, client, server, led);
 }
 
