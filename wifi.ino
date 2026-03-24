@@ -1,7 +1,14 @@
 #include "wifi.h"
 #include <Arduino.h>
 
-void setupAP(const char ssid[], const char pass[], int ip1, int ip2, int ip3, int ip4,
+// These variables live in dispenser.cpp
+extern int cr1, cr2, cr3;
+extern int cr1_r, cr2_r, cr3_r;
+extern int effective_cr1, effective_cr2, effective_cr3;
+extern bool remoto;
+
+void setupAP(const char ssid[], const char pass[],
+             int ip1, int ip2, int ip3, int ip4,
              WiFiServer &server, int &status)
 {
     if (WiFi.status() == WL_NO_MODULE) {
@@ -11,13 +18,13 @@ void setupAP(const char ssid[], const char pass[], int ip1, int ip2, int ip3, in
 
     WiFi.config(IPAddress(ip1, ip2, ip3, ip4));
 
-    Serial.print("Creating access point named: ");
+    Serial.print("Creating access point: ");
     Serial.println(ssid);
 
     status = WiFi.beginAP(ssid, pass);
 
     if (status != WL_AP_LISTENING) {
-        Serial.println("Creating access point failed");
+        Serial.println("AP creation failed");
         while (true);
     }
 
@@ -26,75 +33,105 @@ void setupAP(const char ssid[], const char pass[], int ip1, int ip2, int ip3, in
     printWiFiStatus();
 }
 
-void wifiTask(void *pvParameters)
+void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
 {
-    WifiTaskParams *params = (WifiTaskParams *)pvParameters;
+    // Detect AP connection changes
+    if (status != WiFi.status()) {
+        status = WiFi.status();
+        Serial.println("AP status changed");
 
-    WiFiServer &server = *params->server;
-    int &status = *params->status;
-    int led = params->ledPin;
+        if (status == WL_AP_CONNECTED) {
+            IPAddress ip = client.remoteIP();
+            Serial.print("Client connected from: ");
+            Serial.println(ip);
 
-    WiFiClient client;
+        } else {
+            Serial.println("Client disconnected");
+        }
+    }
 
-    for (;;) {
-        if (status != WiFi.status()) {
-            status = WiFi.status();
-            Serial.println("Access Point Web Server");
+    client = server.available();
 
-            if (status == WL_AP_CONNECTED)
-                Serial.println("Device connected to AP");
-            else
-                Serial.println("Device disconnected from AP");
+    if (client) {
+        String request = "";
+        while (client.connected()) {
+            if (client.available()) {
+                char c = client.read();
+                request += c;
+                if (c == '\n') break;
+            }
         }
 
-        client = server.available();
+        request.trim(); // important
 
-        if (client) {
-            Serial.println("new client");
-            String currentLine = "";
+        // -------------------------
+        //        /get endpoint
+        // -------------------------
+        if (request.startsWith("GET /get")) {
+            Serial.println("Received /get request");
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-Type: application/json");
+            client.println("Connection: close\n");
 
-            while (client.connected()) {
-                if (client.available()) {
-                    char c = client.read();
-                    Serial.write(c);
+            client.print("{");
+            client.print("\"cr1\":"); client.print(cr1); client.print(",");
+            client.print("\"cr2\":"); client.print(cr2); client.print(",");
+            client.print("\"cr3\":"); client.print(cr3); client.print(",");
+            client.print("\"cr1_r\":"); client.print(cr1_r); client.print(",");
+            client.print("\"cr2_r\":"); client.print(cr2_r); client.print(",");
+            client.print("\"cr3_r\":"); client.print(cr3_r); client.print(",");
+            client.print("\"effective_cr1\":"); client.print(effective_cr1); client.print(",");
+            client.print("\"effective_cr2\":"); client.print(effective_cr2); client.print(",");
+            client.print("\"effective_cr3\":"); client.print(effective_cr3); client.print(",");
+            client.print("\"mode\":\""); client.print(remoto ? "remote" : "local"); client.print("\"");
+            client.print("}");
+        }
 
-                    if (c == '\n') {
-                        if (currentLine.length() == 0) {
-                            client.println("HTTP/1.1 200 OK");
-                            client.println("Content-type:text/html");
-                            client.println("Connection: close\n");
+        // -------------------------
+        //        /set endpoint
+        // -------------------------
+        else if (request.startsWith("GET /set")) {
+            Serial.println("Received /set request");
 
-                            client.print(
-                                "<!DOCTYPE HTML><html><head>"
-                                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-                                "<title>WiFi Pet Food Dispenser Control</title>"
-                                "</head><body style=\"text-align:center;\">"
-                                "<p style=\"font-size:2vw;\">Click <a href=\"/H\">here</a> to turn LED ON</p>"
-                                "<p style=\"font-size:2vw;\">Click <a href=\"/L\">here</a> to turn LED OFF</p>"
-                                "</body></html>"
-                            );
+            int q = request.indexOf("?");
+            if (q != -1) {
+                String query = request.substring(q + 1);
 
-                            break;
-                        } else {
-                            currentLine = "";
-                        }
-                    } else if (c != '\r') {
-                        currentLine += c;
-                    }
+                // --- remote CR values ---
+                if (query.indexOf("cr1_r=") != -1) {
+                    cr1_r = query.substring(query.indexOf("cr1_r=") + 6).toInt();
+                    Serial.println("cr1_r set to " + String(cr1_r));
+                }
 
-                    if (currentLine.endsWith("GET /H"))
-                        digitalWrite(led, HIGH);
+                if (query.indexOf("cr2_r=") != -1) {
+                    cr2_r = query.substring(query.indexOf("cr2_r=") + 6).toInt();
+                    Serial.println("cr2_r set to " + String(cr2_r));
+                }
 
-                    if (currentLine.endsWith("GET /L"))
-                        digitalWrite(led, LOW);
+                if (query.indexOf("cr3_r=") != -1) {
+                    cr3_r = query.substring(query.indexOf("cr3_r=") + 6).toInt();
+                    Serial.println("cr3_r set to " + String(cr3_r));
+                }
+
+                // --- mode ---
+                if (query.indexOf("mode=remote") != -1 && !remoto) {
+                    remoto = true;
+                    Serial.println("Mode set to remote");
+                }
+
+                if (query.indexOf("mode=local") != -1 && remoto) {
+                    remoto = false;
+                    Serial.println("Mode set to local");
                 }
             }
 
-            client.stop();
-            Serial.println("client disconnected");
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-Type: application/json");
+            client.println("Connection: close\n");
+            client.print("{\"status\":\"ok\"}");
         }
 
-        vTaskDelay(1);
+        client.stop();
     }
 }
 
@@ -103,7 +140,6 @@ void printWiFiStatus()
     Serial.print("SSID: ");
     Serial.println(WiFi.SSID());
 
-    IPAddress ip = WiFi.localIP();
     Serial.print("IP Address: ");
-    Serial.println(ip);
+    Serial.println(WiFi.localIP());
 }

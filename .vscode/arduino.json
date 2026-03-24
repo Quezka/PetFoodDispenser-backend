@@ -1,5 +1,6 @@
 {
     "port": "/dev/ttyACM0",
     "board": "arduino:renesas_uno:unor4wifi",
-    "sketch": "PetFoodDispenser-backend.ino"
+    "sketch": "PetFoodDispenser-backend.ino",
+    "programmer": "cmsis-dap"
 }
