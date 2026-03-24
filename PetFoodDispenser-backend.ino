@@ -1,33 +1,39 @@
-/* 
-  Find the full UNO R4 WiFi Network documentation here:
-  https://docs.arduino.cc/tutorials/uno-r4-wifi/wifi-examples#access-point
-*/
-
-#include "WiFiS3.h"
-#include "arduino_secrets.h" 
+#include <Arduino_FreeRTOS.h>
 #include "wifi.h"
+#include "arduino_secrets.h"
 
-char ssid[] = SECRET_SSID;  // your network SSID (name)
-char pass[] = SECRET_PASS;  // network password
-int led =  LED_BUILTIN;
-int status = WL_IDLE_STATUS;
+char ssid[] = SECRET_SSID;
+char pass[] = SECRET_PASS;
+
 WiFiServer server(80);
-WiFiClient client;
+int status = WL_IDLE_STATUS;
+
+TaskHandle_t wifiTaskHandle;
 
 void setup() {
-  Serial.begin(115200);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
-  Serial.println("Serial Connected!");
-  
-  pinMode(led, OUTPUT);
+    Serial.begin(115200);
+    while (!Serial);
 
-  setupAP(ssid, pass, 192,168,4,1, server);
+    pinMode(LED_BUILTIN, OUTPUT);
+
+    setupAP(ssid, pass, 192, 168, 4, 1, server, status);
+
+    static WifiTaskParams wifiParams = {
+        .server = &server,
+        .status = &status,
+        .ledPin = LED_BUILTIN
+    };
+
+    xTaskCreate(
+        wifiTask,
+        "WiFiTask",
+        4096,
+        &wifiParams,
+        1,
+        &wifiTaskHandle
+    );
+
+    vTaskStartScheduler();
 }
 
-
-void loop() {
- wifiLoop(status, client, server, led);
-}
-
+void loop() {}

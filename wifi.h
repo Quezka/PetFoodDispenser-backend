@@ -1,12 +1,18 @@
-#ifndef WIFI_H
-#define WIFI_H
+#ifndef WIFI_TASK_H
+#define WIFI_TASK_H
 
 #include <WiFiS3.h>
 
-void setupAP(const char ssid[], const char pass[],
-             int ip1, int ip2, int ip3, int ip4,
-             WiFiServer &server);
+struct WifiTaskParams {
+    WiFiServer *server;
+    int *status;
+    int ledPin;
+};
 
-void wifiLoop(int &status, WiFiClient &client, WiFiServer &server, int led);
+void setupAP(const char ssid[], const char pass[], int ip1, int ip2, int ip3, int ip4,
+             WiFiServer &server, int &status);
+
+void wifiTask(void *pvParameters);
+void printWiFiStatus();
 
 #endif

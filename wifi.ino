@@ -1,160 +1,109 @@
-/* 
-  Find the full UNO R4 WiFi Network documentation here:
-  https://docs.arduino.cc/tutorials/uno-r4-wifi/wifi-examples#access-point
-*/
-
-#include "WiFiS3.h"
 #include "wifi.h"
+#include <Arduino.h>
 
-void setupAP(const char ssid[], const char pass[], int ip1, int ip2, int ip3, int ip4, WiFiServer &server) {
-  // check for the WiFi module:
-  if (WiFi.status() == WL_NO_MODULE) {
-    Serial.println("Communication with WiFi module failed!");
-    // don't continue
-    while (true);
-  }
-  WiFi.config(IPAddress(ip1, ip2, ip3, ip4));
-  
-  // print the network name (SSID);
-  Serial.print("Creating access point named: ");
-  Serial.println(ssid);
+void setupAP(const char ssid[], const char pass[], int ip1, int ip2, int ip3, int ip4,
+             WiFiServer &server, int &status)
+{
+    if (WiFi.status() == WL_NO_MODULE) {
+        Serial.println("Communication with WiFi module failed!");
+        while (true);
+    }
 
-  status = WiFi.beginAP(ssid, pass);
-  if (status != WL_AP_LISTENING) {
-    Serial.println("Creating access point failed");
-    while (true);
-  }
-  Serial.println("Waiting 2 seconds for connection...");
-  // wait 10 seconds for connection:
-  delay(2000);
-  // start the web server on port 80
-  server.begin();
-  // you're connected now, so print out the status
-  printWiFiStatus();
+    WiFi.config(IPAddress(ip1, ip2, ip3, ip4));
+
+    Serial.print("Creating access point named: ");
+    Serial.println(ssid);
+
+    status = WiFi.beginAP(ssid, pass);
+
+    if (status != WL_AP_LISTENING) {
+        Serial.println("Creating access point failed");
+        while (true);
+    }
+
+    delay(2000);
+    server.begin();
+    printWiFiStatus();
 }
 
-void wifiLoop(int &status, WiFiClient &client, WiFiServer &server, int led) {
-  // compare the previous status to the current status
-  if (status != WiFi.status()) {
-    status = WiFi.status();
-  Serial.println("Access Point Web Server");
-    if (status == WL_AP_CONNECTED) {
-      Serial.println("Device connected to AP");
-    } else {
-      Serial.println("Device disconnected from AP");
-    }
-  }
-  
-  client = server.available();   // listen for incoming clients
+void wifiTask(void *pvParameters)
+{
+    WifiTaskParams *params = (WifiTaskParams *)pvParameters;
 
-  if (client) {                             // if you get a client,
-    Serial.println("new client");           // print a message out the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    while (client.connected()) {            // loop while the client's connected
-      delayMicroseconds(10);                // This is required for the Arduino Nano RP2040 Connect - otherwise it will loop so fast that SPI will never be served.
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out to the serial monitor
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK\nContent-type:text/html\nConnection: close\n");
-            // the content of the HTTP response follows the header:
-            client.print("<!DOCTYPE HTML><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>WiFi Pet Food Dispenser Control</title></head><body style=\"text-align:center;\"><p style=\"font-size:2vw;\">Click <a href=\"/H\">here</a> turn the LED on<br></p><p style=\"font-size:2vw;\">Click <a href=\"/L\">here</a> turn the LED off<br></p></body></html>\n");
-            // break out of the while loop:
-            break;
-          }
-          else {      // if you got a newline, then clear currentLine:
-            currentLine = "";
-          }
-        }
-        else if (c != '\r') {    // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
+    WiFiServer &server = *params->server;
+    int &status = *params->status;
+    int led = params->ledPin;
+
+    WiFiClient client;
+
+    for (;;) {
+        if (status != WiFi.status()) {
+            status = WiFi.status();
+            Serial.println("Access Point Web Server");
+
+            if (status == WL_AP_CONNECTED)
+                Serial.println("Device connected to AP");
+            else
+                Serial.println("Device disconnected from AP");
         }
 
-        // Check to see if the client request was "GET /H" or "GET /L":
-        if (currentLine.endsWith("GET /H")) {
-          digitalWrite(led, HIGH);               // GET /H turns the LED on
+        client = server.available();
+
+        if (client) {
+            Serial.println("new client");
+            String currentLine = "";
+
+            while (client.connected()) {
+                if (client.available()) {
+                    char c = client.read();
+                    Serial.write(c);
+
+                    if (c == '\n') {
+                        if (currentLine.length() == 0) {
+                            client.println("HTTP/1.1 200 OK");
+                            client.println("Content-type:text/html");
+                            client.println("Connection: close\n");
+
+                            client.print(
+                                "<!DOCTYPE HTML><html><head>"
+                                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                                "<title>WiFi Pet Food Dispenser Control</title>"
+                                "</head><body style=\"text-align:center;\">"
+                                "<p style=\"font-size:2vw;\">Click <a href=\"/H\">here</a> to turn LED ON</p>"
+                                "<p style=\"font-size:2vw;\">Click <a href=\"/L\">here</a> to turn LED OFF</p>"
+                                "</body></html>"
+                            );
+
+                            break;
+                        } else {
+                            currentLine = "";
+                        }
+                    } else if (c != '\r') {
+                        currentLine += c;
+                    }
+
+                    if (currentLine.endsWith("GET /H"))
+                        digitalWrite(led, HIGH);
+
+                    if (currentLine.endsWith("GET /L"))
+                        digitalWrite(led, LOW);
+                }
+            }
+
+            client.stop();
+            Serial.println("client disconnected");
         }
-        if (currentLine.endsWith("GET /L")) {
-          digitalWrite(led, LOW);                // GET /L turns the LED off
-        }
-      }
+
+        vTaskDelay(1);
     }
-    // close the connection:
-    client.stop();
-    Serial.println("client disconnected");
-  }
 }
 
-/*  
-  // compare the previous status to the current status
-  if (status != WiFi.status()) {
-    status = WiFi.status();
-  Serial.println("Access Point Web Server");
-    if (status == WL_AP_CONNECTED) {
-      Serial.println("Device connected to AP");
-    } else {
-      Serial.println("Device disconnected from AP");
-    }
-  }
-  
-  WiFiClient client = server.available();   // listen for incoming clients
+void printWiFiStatus()
+{
+    Serial.print("SSID: ");
+    Serial.println(WiFi.SSID());
 
-  if (client) {                             // if you get a client,
-    Serial.println("new client");           // print a message out the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    while (client.connected()) {            // loop while the client's connected
-      delayMicroseconds(10);                // This is required for the Arduino Nano RP2040 Connect - otherwise it will loop so fast that SPI will never be served.
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out to the serial monitor
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK\nContent-type:text/html\nConnection: close\n");
-            // the content of the HTTP response follows the header:
-            client.print("<!DOCTYPE HTML><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>WiFi Pet Food Dispenser Control</title></head><body style=\"text-align:center;\"><p style=\"font-size:2vw;\">Click <a href=\"/H\">here</a> turn the LED on<br></p><p style=\"font-size:2vw;\">Click <a href=\"/L\">here</a> turn the LED off<br></p></body></html>\n");
-            // break out of the while loop:
-            break;
-          }
-          else {      // if you got a newline, then clear currentLine:
-            currentLine = "";
-          }
-        }
-        else if (c != '\r') {    // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
-
-        // Check to see if the client request was "GET /H" or "GET /L":
-        if (currentLine.endsWith("GET /H")) {
-          digitalWrite(led, HIGH);               // GET /H turns the LED on
-        }
-        if (currentLine.endsWith("GET /L")) {
-          digitalWrite(led, LOW);                // GET /L turns the LED off
-        }
-      }
-    }
-    // close the connection:
-    client.stop();
-    Serial.println("client disconnected");
-  }
-
-*/
-
-void printWiFiStatus() {
-  // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
-
-  // print your WiFi shield's IP address:
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
+    IPAddress ip = WiFi.localIP();
+    Serial.print("IP Address: ");
+    Serial.println(ip);
 }
