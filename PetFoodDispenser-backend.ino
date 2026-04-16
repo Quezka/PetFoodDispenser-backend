@@ -2,6 +2,12 @@
 #include "dispenser.h"
 #include "arduino_secrets.h"
 
+/*
+*   IoT Pet Food Dispenser - IIS "E. Alessandrini"
+*   v.1.0 - release
+*   16/04/2026
+*/
+
 char ssid[] = SECRET_SSID;
 char pass[] = SECRET_PASS;
 

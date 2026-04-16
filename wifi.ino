@@ -1,7 +1,7 @@
 #include "wifi.h"
 #include <Arduino.h>
 
-// These variables live in dispenser.cpp
+// These variables live in dispenser.ino
 extern int cr1, cr2, cr3;
 extern int cr1_r, cr2_r, cr3_r;
 extern int effective_cr1, effective_cr2, effective_cr3;

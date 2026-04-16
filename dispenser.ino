@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "dispenser.h"
 
-/* Tutte le tue variabili globali rimangono qui */
+/* Le Variabili Globali del Dispenser */
 int motor           = 3;
 int valore          = 255;
 int led1            = 11;
