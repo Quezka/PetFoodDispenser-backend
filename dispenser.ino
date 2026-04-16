@@ -1,67 +1,85 @@
-// dispenser.ino
-
 #include <Arduino.h>
 #include "dispenser.h"
-#include "wifi.h"   // <-- necessario per sendSSEUpdate()
+#include "wifi.h"   // necessario per sendSSEUpdate()
 
-/* Le Variabili Globali del Dispenser */
-int motor           = 3;
-int valore          = 255;
-int led1            = 11;
-int lettura         = 0;
+/* --- VARIABILI GLOBALI --- */
 
-int Q1_H2O          = 21000;
-int Q2_H2O          = 42000;
-int Q3_H2O          = 72000;
-int Q4_H2O          = 120000;
-int Q5_H2O          = 180000;
+// Attuatori
+int motorPin        = 3;
+int motorPower      = 255;
+int statusLedPin    = 11;
+int buzzerLedPin    = 11;
 
-int QMP = 0, QP = 0, QM = 0, QMA = 0, QA = 0;
+// Sensore ultrasuoni
+const int trigPin   = 10;
+const int echoPin   = 9;
+int echoDuration    = 0;
+int waterDistance   = 0;
+int waterLevelLimit = 50;
 
-int ledbuzzer       = 11;
-int tempo           = 0;
-int tempoR          = 0;
+// Timer interno
+int timer_hours     = 0;
+int timer_minutes   = 0;
+int timer_seconds   = 0;
 
-int pos5 = 750, pos4 = 600, pos3 = 450, pos2 = 300, pos1 = 150;
+// Quantità acqua (ms di attivazione motore)
+int qty_H2O_1       = 21000;
+int qty_H2O_2       = 42000;
+int qty_H2O_3       = 72000;
+int qty_H2O_4       = 120000;
+int qty_H2O_5       = 180000;
 
-int cr1 = 0, cr1_old = 0;
-int cr2 = 0, cr2_old = 0;
-int cr3 = 0, cr3_old = 0;
+// Variabili derivate dai commutatori
+int freq_hoursSelected = 0;   // da commutatore 2
+int freq_divisor       = 0;   // da commutatore 2
+int qty_msToDispense   = 0;   // da commutatore 3
 
-int cr1_r = 0, cr2_r = 0, cr3_r = 0;
+// Posizioni commutatori (soglie ADC)
+int adcPos1 = 150;
+int adcPos2 = 300;
+int adcPos3 = 450;
+int adcPos4 = 600;
+int adcPos5 = 750;
 
-int h = 0, m = 0, s = 0;
+/* --- COMMUTATORI FISICI --- */
 
-int Q_P = 0;
-int Q_mot = 0;
-int giro = 100;
-int H2O_P = 1000;
-int divisor = 0;
+// Commutatore 1 → Tempo
+int timeSelector_value = 0;
+int timeSelector_prev  = 0;
 
-const int trigPin = 10;
-const int echoPin = 9;
+// Commutatore 2 → Frequenza
+int freqSelector_value = 0;
+int freqSelector_prev  = 0;
 
-int duration = 0;
-int distance = 0;
-int livello = 50;
-int sensore_livello = 0;
+// Commutatore 3 → Quantità
+int qtySelector_value  = 0;
+int qtySelector_prev   = 0;
 
-int tensioneBatterie = 0;
+/* --- COMMUTATORI REMOTI --- */
+int timeSelector_remote = 0;
+int freqSelector_remote = 0;
+int qtySelector_remote  = 0;
 
-bool remoto = false;
+bool remoteMode = false;
 
-int effective_cr1, effective_cr2, effective_cr3;
+// Valori effettivi (fisici o remoti)
+int timeSelector_effective;
+int freqSelector_effective;
+int qtySelector_effective;
 
-/* --- PROTOTIPI DELLE FUNZIONI INTERNE --- */
-void confronti_sw1(int lettura);
-void confronti_sw2(int lettura);
-void confronti_sw3(int lettura);
+// Batteria
+int batteryVoltage = 0;
 
-/* --- SETUP DEL DISPENSER --- */
+/* --- PROTOTIPI FUNZIONI --- */
+void readTimeSelector(int adc);
+void readFrequencySelector(int adc);
+void readQuantitySelector(int adc);
+
+/* --- SETUP --- */
 void dispenserSetup() {
-    pinMode(motor, OUTPUT);
-    pinMode(led1, OUTPUT);
-    pinMode(ledbuzzer, OUTPUT);
+    pinMode(motorPin, OUTPUT);
+    pinMode(statusLedPin, OUTPUT);
+    pinMode(buzzerLedPin, OUTPUT);
     pinMode(trigPin, OUTPUT);
     pinMode(echoPin, INPUT);
 
@@ -69,133 +87,141 @@ void dispenserSetup() {
     analogReadResolution(10);
 }
 
-/* --- LOOP DEL DISPENSER (TUTTA LA TUA LOGICA) --- */
+/* --- LOOP PRINCIPALE --- */
 void dispenserLoop() {
-    effective_cr1 = remoto ? cr1_r : cr1;
-    effective_cr2 = remoto ? cr2_r : cr2;
-    effective_cr3 = remoto ? cr3_r : cr3;
+
+    // Se remoto → usa valori remoti
+    timeSelector_effective = remoteMode ? timeSelector_remote : timeSelector_value;
+    freqSelector_effective = remoteMode ? freqSelector_remote : freqSelector_value;
+    qtySelector_effective  = remoteMode ? qtySelector_remote  : qtySelector_value;
 
     delay(16);
-    s++;
+    timer_seconds++;
 
-    if (h >= tempo) {
-        digitalWrite(led1, HIGH);
-        analogWrite(motor, valore);
+    /* --- CICLO DI EROGAZIONE --- */
+    if (timer_hours >= freq_hoursSelected) {
 
-        delay(Q_P);
+        digitalWrite(statusLedPin, HIGH);
+        analogWrite(motorPin, motorPower);
 
-        analogWrite(motor, 0);
-        digitalWrite(led1, LOW);
+        delay(qty_msToDispense);
 
+        analogWrite(motorPin, 0);
+        digitalWrite(statusLedPin, LOW);
+
+        // Misura livello acqua
         digitalWrite(trigPin, LOW);
         delayMicroseconds(2);
         digitalWrite(trigPin, HIGH);
         delayMicroseconds(10);
         digitalWrite(trigPin, LOW);
 
-        duration = pulseIn(echoPin, HIGH);
-        distance = (duration * 0.0343) / 2;
+        echoDuration = pulseIn(echoPin, HIGH);
+        waterDistance = (echoDuration * 0.0343) / 2;
 
         Serial.print("Distance: ");
-        Serial.println(distance);
+        Serial.println(waterDistance);
 
-        if (distance > livello) {
+        if (waterDistance > waterLevelLimit) {
             for (int i = 0; i < 3; i++) {
-                digitalWrite(led1, HIGH);
-                delay(100);
-                digitalWrite(led1, LOW);
-                delay(100);
+                digitalWrite(statusLedPin, HIGH); delay(100);
+                digitalWrite(statusLedPin, LOW);  delay(100);
             }
-            digitalWrite(led1, HIGH);
-            delay(500);
-            digitalWrite(led1, LOW);
+            digitalWrite(statusLedPin, HIGH); delay(500);
+            digitalWrite(statusLedPin, LOW);
         }
 
         delay(1000);
 
-        h = 0;
-        m = 0;
-        s = 0;
+        timer_hours = 0;
+        timer_minutes = 0;
+        timer_seconds = 0;
     }
 
-    if (s == 60) {
-        m++;
-        s = 0;
+    /* --- TIMER INTERNO --- */
+    if (timer_seconds == 60) {
+        timer_minutes++;
+        timer_seconds = 0;
 
-        if (m == 60) {
-            h++;
-            m = 0;
+        if (timer_minutes == 60) {
+            timer_hours++;
+            timer_minutes = 0;
 
-            if (h == 24) {
-                h = 0;
+            if (timer_hours == 24) {
+                timer_hours = 0;
             }
         }
     }
 
-    // Salva vecchi valori
-    cr1_old = cr1;
-    cr2_old = cr2;
-    cr3_old = cr3;
+    /* --- SALVA VALORI PRECEDENTI --- */
+    timeSelector_prev = timeSelector_value;
+    freqSelector_prev = freqSelector_value;
+    qtySelector_prev  = qtySelector_value;
 
-    // Leggi commutatori
-    confronti_sw1(analogRead(A0));
-    confronti_sw2(analogRead(A1));
-    confronti_sw3(analogRead(A2));
+    /* --- LEGGI COMMUTATORI --- */
+    readTimeSelector(analogRead(A0));
+    readFrequencySelector(analogRead(A1));
+    readQuantitySelector(analogRead(A2));
 
-    // --- HOOK SSE: invia aggiornamento se cambia qualcosa ---
-    if (cr1 != cr1_old || cr2 != cr2_old || cr3 != cr3_old) {
+    /* --- HOOK SSE --- */
+    if (timeSelector_value != timeSelector_prev ||
+        freqSelector_value != freqSelector_prev ||
+        qtySelector_value  != qtySelector_prev) {
         sendSSEUpdate();
     }
 
-    /* lampeggi di feedback */
-    if (cr1 != cr1_old) {
-        for (int i = 0; i < cr1; i++) {
-            digitalWrite(led1, HIGH); delay(100);
-            digitalWrite(led1, LOW);  delay(100);
+    /* --- FEEDBACK LED --- */
+    if (timeSelector_value != timeSelector_prev) {
+        for (int i = 0; i < timeSelector_value; i++) {
+            digitalWrite(statusLedPin, HIGH); delay(100);
+            digitalWrite(statusLedPin, LOW);  delay(100);
         }
     }
 
-    if (cr2 != cr2_old) {
-        for (int i = 0; i < cr2; i++) {
-            digitalWrite(led1, HIGH); delay(100);
-            digitalWrite(led1, LOW);  delay(100);
+    if (freqSelector_value != freqSelector_prev) {
+        for (int i = 0; i < freqSelector_value; i++) {
+            digitalWrite(statusLedPin, HIGH); delay(100);
+            digitalWrite(statusLedPin, LOW);  delay(100);
         }
     }
 
-    if (cr3 != cr3_old) {
-        for (int i = 0; i < cr3; i++) {
-            digitalWrite(led1, HIGH); delay(100);
-            digitalWrite(led1, LOW);  delay(100);
+    if (qtySelector_value != qtySelector_prev) {
+        for (int i = 0; i < qtySelector_value; i++) {
+            digitalWrite(statusLedPin, HIGH); delay(100);
+            digitalWrite(statusLedPin, LOW);  delay(100);
         }
     }
 }
 
-/* --- FUNZIONI DI LETTURA COMMUTATORI --- */
-void confronti_sw1(int lettura) {
-    if (lettura > pos5) { tempoR = 4; cr1 = 5; return; }
-    if (lettura > pos4) { tempoR = 3; cr1 = 4; return; }
-    if (lettura > pos3) { tempoR = 2; cr1 = 3; return; }
-    if (lettura > pos2) { tempoR = 1; cr1 = 2; return; }
-    if (lettura > pos1) {
-        tempoR = 0;
-        if (cr1 != 1) { h = m = s = 0; }
-        cr1 = 1;
+/* --- LETTURA COMMUTATORE 1 (TEMPO) --- */
+void readTimeSelector(int adc) {
+    if (adc > adcPos5) { timeSelector_value = 5; return; }
+    if (adc > adcPos4) { timeSelector_value = 4; return; }
+    if (adc > adcPos3) { timeSelector_value = 3; return; }
+    if (adc > adcPos2) { timeSelector_value = 2; return; }
+    if (adc > adcPos1) {
+        if (timeSelector_value != 1) {
+            timer_hours = timer_minutes = timer_seconds = 0;
+        }
+        timeSelector_value = 1;
         return;
     }
 }
 
-void confronti_sw2(int lettura) {
-    if (lettura > pos5) { tempo = 5; divisor = 2; cr2 = 5; return; }
-    if (lettura > pos4) { tempo = 5; divisor = 3; cr2 = 4; return; }
-    if (lettura > pos3) { tempo = 3; divisor = 4; cr2 = 3; return; }
-    if (lettura > pos2) { tempo = 2; divisor = 6; cr2 = 2; return; }
-    if (lettura > pos1) { tempo = 1; divisor = 8; cr2 = 1; return; }
+/* --- LETTURA COMMUTATORE 2 (FREQUENZA) --- */
+void readFrequencySelector(int adc) {
+    if (adc > adcPos5) { freq_hoursSelected = 5; freq_divisor = 2; freqSelector_value = 5; return; }
+    if (adc > adcPos4) { freq_hoursSelected = 5; freq_divisor = 3; freqSelector_value = 4; return; }
+    if (adc > adcPos3) { freq_hoursSelected = 3; freq_divisor = 4; freqSelector_value = 3; return; }
+    if (adc > adcPos2) { freq_hoursSelected = 2; freq_divisor = 6; freqSelector_value = 2; return; }
+    if (adc > adcPos1) { freq_hoursSelected = 1; freq_divisor = 8; freqSelector_value = 1; return; }
 }
 
-void confronti_sw3(int lettura) {
-    if (lettura > pos5) { QMA = 1; cr3 = 5; Q_P = Q5_H2O / divisor; return; }
-    if (lettura > pos4) { QA  = 1; cr3 = 4; Q_P = Q4_H2O / divisor; return; }
-    if (lettura > pos3) { QM  = 1; cr3 = 3; Q_P = Q3_H2O / divisor; return; }
-    if (lettura > pos2) { QP  = 1; cr3 = 2; Q_P = Q2_H2O / divisor; return; }
-    if (lettura > pos1) { QMP = 1; cr3 = 1; Q_P = Q1_H2O / divisor; return; }
+/* --- LETTURA COMMUTATORE 3 (QUANTITÀ) --- */
+void readQuantitySelector(int adc) {
+    if (adc > adcPos5) { qtySelector_value = 5; qty_msToDispense = qty_H2O_5 / freq_divisor; return; }
+    if (adc > adcPos4) { qtySelector_value = 4; qty_msToDispense = qty_H2O_4 / freq_divisor; return; }
+    if (adc > adcPos3) { qtySelector_value = 3; qty_msToDispense = qty_H2O_3 / freq_divisor; return; }
+    if (adc > adcPos2) { qtySelector_value = 2; qty_msToDispense = qty_H2O_2 / freq_divisor; return; }
+    if (adc > adcPos1) { qtySelector_value = 1; qty_msToDispense = qty_H2O_1 / freq_divisor; return; }
 }
