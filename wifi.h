@@ -1,3 +1,5 @@
+// wifi.h
+
 #ifndef WIFI_H
 #define WIFI_H
 
@@ -10,5 +12,8 @@ void setupAP(const char ssid[], const char pass[],
 void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client);
 
 void printWiFiStatus();
+
+// Aggiunta per SSE
+void sendSSEUpdate();
 
 #endif

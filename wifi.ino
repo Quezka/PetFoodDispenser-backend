@@ -1,11 +1,20 @@
+// wifi.ino
+
 #include "wifi.h"
 #include <Arduino.h>
 
-// These variables live in dispenser.ino
+// Variabili che arrivano da dispenser.ino
 extern int cr1, cr2, cr3;
 extern int cr1_r, cr2_r, cr3_r;
 extern int effective_cr1, effective_cr2, effective_cr3;
 extern bool remoto;
+
+// --- Variabili per SSE ---
+WiFiClient sseClient;
+bool sseConnected = false;
+
+// --- PROTOTIPO ---
+void sendSSEUpdate();
 
 void setupAP(const char ssid[], const char pass[],
              int ip1, int ip2, int ip3, int ip4,
@@ -35,7 +44,7 @@ void setupAP(const char ssid[], const char pass[],
 
 void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
 {
-    // Detect AP connection changes
+    // Rileva cambi di stato AP
     if (status != WiFi.status()) {
         status = WiFi.status();
         Serial.println("AP status changed");
@@ -44,9 +53,9 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
             IPAddress ip = client.remoteIP();
             Serial.print("Client connected from: ");
             Serial.println(ip);
-
         } else {
             Serial.println("Client disconnected");
+            sseConnected = false; // chiudi SSE se il client sparisce
         }
     }
 
@@ -62,7 +71,26 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
             }
         }
 
-        request.trim(); // important
+        request.trim();
+
+        // -------------------------
+        //        /events endpoint
+        // -------------------------
+        if (request.startsWith("GET /events")) {
+            Serial.println("SSE client connected");
+
+            sseClient = client;
+            sseConnected = true;
+
+            sseClient.println("HTTP/1.1 200 OK");
+            sseClient.println("Content-Type: text/event-stream");
+            sseClient.println("Cache-Control: no-cache");
+            sseClient.println("Connection: keep-alive");
+            sseClient.println();
+
+            // NON chiudere la connessione
+            return;
+        }
 
         // -------------------------
         //        /get endpoint
@@ -97,7 +125,6 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
             if (q != -1) {
                 String query = request.substring(q + 1);
 
-                // --- remote CR values ---
                 if (query.indexOf("cr1_r=") != -1) {
                     cr1_r = query.substring(query.indexOf("cr1_r=") + 6).toInt();
                     Serial.println("cr1_r set to " + String(cr1_r));
@@ -113,7 +140,6 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
                     Serial.println("cr3_r set to " + String(cr3_r));
                 }
 
-                // --- mode ---
                 if (query.indexOf("mode=remote") != -1 && !remoto) {
                     remoto = true;
                     Serial.println("Mode set to remote");
@@ -133,6 +159,23 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
 
         client.stop();
     }
+}
+
+void sendSSEUpdate() {
+    if (!sseConnected || !sseClient.connected()) {
+        sseConnected = false;
+        return;
+    }
+
+    sseClient.print("event: knobUpdate\n");
+    sseClient.print("data: {\"cr1\":");
+    sseClient.print(cr1);
+    sseClient.print(",\"cr2\":");
+    sseClient.print(cr2);
+    sseClient.print(",\"cr3\":");
+    sseClient.print(cr3);
+    sseClient.println("}\n");
+    sseClient.println();
 }
 
 void printWiFiStatus()

@@ -1,3 +1,3 @@
-// arduino_secrets.h header file per nascondere i dati sensibili
+// arduino_secrets.h
 #define SECRET_SSID "PetFoodDispenserAlessandrini"
 #define SECRET_PASS "alessandrini2026"
