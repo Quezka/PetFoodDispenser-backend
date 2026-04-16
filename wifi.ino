@@ -1,5 +1,3 @@
-// wifi.ino
-
 #include "wifi.h"
 #include <Arduino.h>
 
@@ -13,7 +11,6 @@ extern bool remoto;
 WiFiClient sseClient;
 bool sseConnected = false;
 
-// --- PROTOTIPO ---
 void sendSSEUpdate();
 
 void setupAP(const char ssid[], const char pass[],
@@ -55,7 +52,7 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
             Serial.println(ip);
         } else {
             Serial.println("Client disconnected");
-            sseConnected = false; // chiudi SSE se il client sparisce
+            sseConnected = false;
         }
     }
 
@@ -88,8 +85,7 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
             sseClient.println("Connection: keep-alive");
             sseClient.println();
 
-            // NON chiudere la connessione
-            return;
+            return; // NON chiudere la connessione
         }
 
         // -------------------------
@@ -125,30 +121,20 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
             if (q != -1) {
                 String query = request.substring(q + 1);
 
-                if (query.indexOf("cr1_r=") != -1) {
+                if (query.indexOf("cr1_r=") != -1)
                     cr1_r = query.substring(query.indexOf("cr1_r=") + 6).toInt();
-                    Serial.println("cr1_r set to " + String(cr1_r));
-                }
 
-                if (query.indexOf("cr2_r=") != -1) {
+                if (query.indexOf("cr2_r=") != -1)
                     cr2_r = query.substring(query.indexOf("cr2_r=") + 6).toInt();
-                    Serial.println("cr2_r set to " + String(cr2_r));
-                }
 
-                if (query.indexOf("cr3_r=") != -1) {
+                if (query.indexOf("cr3_r=") != -1)
                     cr3_r = query.substring(query.indexOf("cr3_r=") + 6).toInt();
-                    Serial.println("cr3_r set to " + String(cr3_r));
-                }
 
-                if (query.indexOf("mode=remote") != -1 && !remoto) {
+                if (query.indexOf("mode=remote") != -1)
                     remoto = true;
-                    Serial.println("Mode set to remote");
-                }
 
-                if (query.indexOf("mode=local") != -1 && remoto) {
+                if (query.indexOf("mode=local") != -1)
                     remoto = false;
-                    Serial.println("Mode set to local");
-                }
             }
 
             client.println("HTTP/1.1 200 OK");
@@ -161,7 +147,8 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client)
     }
 }
 
-void sendSSEUpdate() {
+void sendSSEUpdate()
+{
     if (!sseConnected || !sseClient.connected()) {
         sseConnected = false;
         return;
