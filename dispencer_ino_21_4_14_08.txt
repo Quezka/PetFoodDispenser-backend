@@ -1,0 +1,298 @@
+// dispenser.ino
+
+#include <Arduino.h>
+#include "dispenser.h"
+#include "wifi.h"   // <-- necessario per sendSSEUpdate()
+
+/* Le Variabili Globali del Dispenser */
+int motor           = 3;
+int valore          = 255;
+int led1            = 11;
+int lettura         = 0;
+
+int Q1_H2O          = 30000; //350ml
+int Q2_H2O          = 60000; //700ml
+int Q3_H2O          = 103000; //1200ml
+int Q4_H2O          = 172000; //2000ml
+int Q5_H2O          = 257000; //3000ml
+
+int Q1_cr          = 21000; //100g           attenzione...da verificare con prove sperimentali
+int Q2_cr          = 42000; //180g
+int Q3_cr          = 72000; //250g
+int Q4_cr          = 120000; //400g
+int Q5_cr          = 180000; //800g
+
+int QMP = 0, QP = 0, QM = 0, QMA = 0, QA = 0;
+
+int ledbuzzer       = 11;
+int tempo           = 0;
+int tempoR          = 0;
+
+int pos5 = 750, pos4 = 600, pos3 = 450, pos2 = 300, pos1 = 150;
+
+int cr1 = 0, cr1_old = 0;
+int cr2 = 0, cr2_old = 0;
+int cr3 = 0, cr3_old = 0;
+
+int cr1_r = 0, cr2_r = 0, cr3_r = 0;
+
+int h = 0, m = 0, s = 0;
+
+int Q_P = 0;
+int Q_mot = 0;
+int giro = 100;
+int H2O_P = 1000;
+int divisor = 0;
+
+const int trigPin = 10;
+const int echoPin = 9;
+
+int duration = 0;
+int distance = 0;
+int livello = 50;
+int sensore_livello = 0;
+
+int tensioneBatterie = 0;
+bool test = true;
+bool remoto = false;
+
+int effective_cr1, effective_cr2, effective_cr3;
+bool reset_tempi;
+bool prima_erogazione;
+
+
+/* --- PROTOTIPI DELLE FUNZIONI INTERNE --- */
+void confronti_sw1(int lettura);
+void confronti_sw2(int lettura);
+void confronti_sw3(int lettura);
+
+/* --- SETUP DEL DISPENSER --- */
+void dispenserSetup() {
+    pinMode(motor, OUTPUT);
+    pinMode(led1, OUTPUT);
+    pinMode(ledbuzzer, OUTPUT);
+    pinMode(trigPin, OUTPUT);
+    pinMode(echoPin, INPUT);
+
+    analogReference(AR_EXTERNAL);
+    analogReadResolution(10);
+}
+
+/* --- LOOP DEL DISPENSER (TUTTA LA TUA LOGICA) --- */
+void dispenserLoop() {
+    effective_cr1 = remoto ? cr1_r : cr1;
+    effective_cr2 = remoto ? cr2_r : cr2;
+    effective_cr3 = remoto ? cr3_r : cr3;
+    if (test==true)  {
+    delay(16);
+    }
+    else {
+        delay(1000);
+    }
+    s++;
+
+    if ((h >= tempo) || (prima_erogazione)) {
+        prima_erogazione=false;
+        digitalWrite(led1, HIGH);
+        analogWrite(motor, valore);
+
+        delay(Q_P);
+
+        analogWrite(motor, 0);
+        digitalWrite(led1, LOW);
+
+        digitalWrite(trigPin, LOW);
+        delayMicroseconds(2);
+        digitalWrite(trigPin, HIGH);
+        delayMicroseconds(10);
+        digitalWrite(trigPin, LOW);
+
+        duration = pulseIn(echoPin, HIGH);
+        distance = (duration * 0.0343) / 2;
+
+        Serial.print("Distance: ");
+        Serial.println(distance);
+
+        if (distance > livello) {
+            for (int i = 0; i < 3; i++) {
+                digitalWrite(led1, HIGH);
+                delay(100);
+                digitalWrite(led1, LOW);
+                delay(100);
+            }
+            digitalWrite(led1, HIGH);
+            delay(500);
+            digitalWrite(led1, LOW);
+        }
+
+        delay(1000);
+
+        h = 0;
+        m = 0;
+        s = 0;
+    }
+
+    if (s == 60) {
+        m++;
+        s = 0;
+
+        if (m == 60) {
+            h++;
+            m = 0;
+
+            if (h == 24) {
+                h = 0;
+            }
+        }
+    }
+
+    // Salva vecchi valori
+    if (remoto==false) {
+    cr1_old = cr1;
+    cr2_old = cr2;
+    cr3_old = cr3;
+    }
+    else {
+    cr1_old = effective_cr1;
+    cr2_old = effective_cr2;
+    cr3_old = effective_cr3;
+    }
+    if (!remoto) {
+    // Leggi commutatori
+    confronti_sw1(analogRead(A0));
+    confronti_sw2(analogRead(A1));
+    confronti_sw3(analogRead(A2));
+    }
+    else {
+        //aggiornamento variabili di erogazione da remoto
+        switch (effective_cr1){
+            case 1:
+            tempoR = 0;
+            if (!reset_tempi) { h = m = s = 0; reset_tempi=true;}
+            prima_erogazione=true;
+            break;
+            case 2:
+            tempoR = 1;
+            reset_tempi=false;
+            break;
+            case 3:
+            tempoR = 2;
+            reset_tempi=false;
+            break;
+            case 4:
+            tempoR = 3;
+            reset_tempi=false;
+            break;
+            case 5:
+            tempoR = 4;
+            reset_tempi=false;
+            break;
+            default:
+            tempoR = 0;
+            reset_tempi=false;
+            break;
+                               }  
+            switch (effective_cr2){
+            case 1:
+            tempo = 3;
+            divisor=8;
+            break;
+            case 2:
+            tempo = 4;
+            divisor=6;
+            break;
+            case 3:
+            tempo = 6;
+            divisor=4;
+            break;
+            case 4:
+            tempo = 8;
+            divisor=3;
+            break;
+            case 5:
+            tempo = 12;
+            divisor=2;
+            break;
+            default:
+            tempo = 4;
+            divisor=6;
+            break;
+                               } 
+            switch (effective_cr3){
+            case 1:
+            Q_P = Q5_H2O / divisor;
+            break;
+            case 2:
+            Q_P = Q4_H2O / divisor;
+            break;
+            case 3:
+            Q_P = Q3_H2O / divisor;
+            break;
+            case 4:
+            Q_P = Q2_H2O / divisor;
+            break;
+            case 5:
+            Q_P = Q1_H2O / divisor;
+            break;
+            default:
+            Q_P = Q3_H2O / divisor;
+            break;
+                               } 
+       } 
+    // --- HOOK SSE: invia aggiornamento se cambia qualcosa ---
+    if ((cr1 != cr1_old || cr2 != cr2_old || cr3 != cr3_old) && !remoto) {
+        sendSSEUpdate();
+    }
+
+    /* lampeggi di feedback */
+    if (effective_cr1 != cr1_old) {
+        for (int i = 0; i < effective_cr1; i++) {
+            digitalWrite(led1, HIGH); delay(100);
+            digitalWrite(led1, LOW);  delay(100);
+        }
+    }
+
+    if (effective_cr2 != cr2_old) {
+        for (int i = 0; i < cr2; i++) {
+            digitalWrite(led1, HIGH); delay(100);
+            digitalWrite(led1, LOW);  delay(100);
+        }
+    }
+
+    if (effective_cr3 != cr3_old) {
+        for (int i = 0; i < cr3; i++) {
+            digitalWrite(led1, HIGH); delay(100);
+            digitalWrite(led1, LOW);  delay(100);
+        }
+    }
+}
+
+/* --- FUNZIONI DI LETTURA COMMUTATORI --- */
+void confronti_sw1(int lettura) {
+    if (lettura > pos5) { tempoR = 4; cr1 = 5; return; }
+    if (lettura > pos4) { tempoR = 3; cr1 = 4; return; }
+    if (lettura > pos3) { tempoR = 2; cr1 = 3; return; }
+    if (lettura > pos2) { tempoR = 1; cr1 = 2; return; }
+    if (lettura > pos1) {
+        tempoR = 0;
+        if (cr1 != 1) { h = m = s = 0; }
+        cr1 = 1;
+        return;
+    }
+}
+
+void confronti_sw2(int lettura) {
+    if (lettura > pos5) { tempo = 12; divisor = 2; cr2 = 5; return; }
+    if (lettura > pos4) { tempo = 8; divisor = 3; cr2 = 4; return; }
+    if (lettura > pos3) { tempo = 6; divisor = 4; cr2 = 3; return; }
+    if (lettura > pos2) { tempo = 4; divisor = 6; cr2 = 2; return; }
+    if (lettura > pos1) { tempo = 3; divisor = 8; cr2 = 1; return; }
+}
+
+void confronti_sw3(int lettura) {
+    if (lettura > pos5) { QMA = 1; cr3 = 5; Q_P = Q5_H2O / divisor; return; }
+    if (lettura > pos4) { QA  = 1; cr3 = 4; Q_P = Q4_H2O / divisor; return; }
+    if (lettura > pos3) { QM  = 1; cr3 = 3; Q_P = Q3_H2O / divisor; return; }
+    if (lettura > pos2) { QP  = 1; cr3 = 2; Q_P = Q2_H2O / divisor; return; }
+    if (lettura > pos1) { QMP = 1; cr3 = 1; Q_P = Q1_H2O / divisor; return; }
+}

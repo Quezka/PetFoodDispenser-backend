@@ -11,22 +11,30 @@ extern bool remoto;
 WiFiClient sseClient;
 bool sseConnected = false;
 
+// Prototipo della funzione dell'sse per ottimizzare
 void sendSSEUpdate();
 
+/*
+Impostazione del Punto d'Accesso WiFi e Server, ssid = nome del punto d'accesso, pass = password, ip1,ip2,ip3,ip4 = indirizzo ip 192, 168, 4, 1
+*/
 void setupAP(const char ssid[], const char pass[],
              int ip1, int ip2, int ip3, int ip4,
              WiFiServer &server, int &status)
 {
+    // Controlla se il modulo WiFi funziona
     if (WiFi.status() == WL_NO_MODULE) {
         Serial.println("Communication with WiFi module failed!");
         while (true);
     }
 
+    // Configura l'ip dell'Arduino nella rete
     WiFi.config(IPAddress(ip1, ip2, ip3, ip4));
 
+    // Debug
     Serial.print("Creating access point: ");
     Serial.println(ssid);
 
+    // 
     status = WiFi.beginAP(ssid, pass);
 
     if (status != WL_AP_LISTENING) {

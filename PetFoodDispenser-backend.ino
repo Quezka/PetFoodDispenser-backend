@@ -6,8 +6,8 @@
 
 /*
 *   IoT Pet Food Dispenser - IIS "E. Alessandrini"
-*   v.1.0 - release
-*   16/04/2026
+*   v.1.0.1
+*   21/04/2026
 */
 
 char ssid[] = SECRET_SSID;
