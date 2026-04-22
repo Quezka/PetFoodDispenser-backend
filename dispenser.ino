@@ -1,5 +1,3 @@
-// dispenser.ino
-
 #include <Arduino.h>
 #include "dispenser.h"
 #include "wifi.h"  // necessario per sendSSEUpdate()
