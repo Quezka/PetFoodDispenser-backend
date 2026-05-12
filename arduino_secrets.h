@@ -1,3 +1,4 @@
 // arduino_secrets.h
-#define SECRET_SSID "PetFoodDispenserAlessandrini"
-#define SECRET_PASS "alessandrini2026"
+// File Header contenente info per la rete WiFi
+#define SECRET_SSID "PetFoodDispenserAlessandrini" // nome rete
+#define SECRET_PASS "alessandrini2026"             // password rete
