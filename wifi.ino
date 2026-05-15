@@ -9,7 +9,11 @@ extern bool remoto;
 
 // Nuove istruzioni
 extern bool test, tipo_dispenser;
+<<<<<<< HEAD
+extern short volume_min, prolunghe_serbatoio;
+=======
 extern int volume_min, prolunghe_serbatoio;
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
 extern bool eroga_ora;
 
 // --- Variabili per SSE ---
