@@ -1,5 +1,5 @@
 // wifi.h
-
+// File Header per passare le funzioni presenti ad altri moduli
 #ifndef WIFI_H
 #define WIFI_H
 
@@ -13,7 +13,7 @@ void wifiLoop(WiFiServer &server, int &status, int ledPin, WiFiClient &client);
 
 void printWiFiStatus();
 
-// Aggiunta per SSE
+// Manda evento SSE
 void sendSSEUpdate();
 
 #endif
