@@ -30,7 +30,11 @@ int ledbuzzer       = 11;
 int tempo           = 0;
 int tempoR          = 0;
 int Vbatt           = 0;  //in mV
+<<<<<<< HEAD
 short batteria_scarica= 0; //0= ok, 1=scarica
+=======
+int batteria_scarica= 0; //0= ok, 1=scarica
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
 int pos5 = 750, pos4 = 600, pos3 = 450, pos2 = 300, pos1 = 150;
 
 int cr1 = 0, cr1_old = 0;
@@ -49,13 +53,18 @@ int divisor = 0;
 
 const int trigPin = 10;
 const int echoPin = 9;
+<<<<<<< HEAD
 short prolunghe_serbatoio=1; //per ogni prolunga aggiungere 12.5cm 
 short prolunghe_serbatoio1=1;
+=======
+int prolunghe_serbatoio=1; //per ogni prolunga aggiungere 12.5cm 
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
 const int Hbase=95; //mm
 const int Hprolunga=125; //mm
 const int superfice=28338;// mm2
 int duration = 0;
 int distance = 0;
+<<<<<<< HEAD
 short volume_min= 0; 
 short volume_min1= 0;//1000 ml o cc sarebbe 1 litro
 //int sensore_livello = 0;
@@ -65,6 +74,15 @@ short offset=2;  //altezza sensore livello in cm dal livello max
 short tensioneBatteria = 0;
 bool test = true;
 bool test1 = true;
+=======
+int volume_min= 0; //1000 ml o cc sarebbe 1 litro
+//int sensore_livello = 0;
+float volume=0;
+int volume_int=0;
+int offset=2;  //altezza sensore livello in cm dal livello max
+int tensioneBatteria = 0;
+bool test = true;
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
 bool remoto = false;
 
 int effective_cr1, effective_cr2, effective_cr3;
@@ -72,8 +90,12 @@ bool reset_tempi;
 bool prima_erogazione;
 bool dir_motore=false;
 bool allarme_livello=false;
+<<<<<<< HEAD
 bool tipo_dispenser=false;
 bool tipo_dispenser1=false; //0 acqua o 1 crocchette
+=======
+bool tipo_dispenser=false; //0 acqua o 1 crocchette
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
 bool eroga_ora=false;
 
 /* --- PROTOTIPI DELLE FUNZIONI INTERNE --- */
@@ -92,12 +114,20 @@ void dispenserSetup() {
     pinMode(dir_motore, OUTPUT); //false => antiorario, true=> orario
     analogReference(AR_EXTERNAL); //riferimento analogico 3.3V
     analogReadResolution(10);
+<<<<<<< HEAD
     EEPROM.get(0,test);
     EEPROM.get(2,tipo_dispenser);
     EEPROM.get(4,prolunghe_serbatoio);
     EEPROM.get(6,volume_min);
     Serial.print("lettura iniziale eeprom: ");
     Serial.print("remoto: ");
+=======
+    /*test=EEPROM.read(0);
+    tipo_dispenser=EEPROM.read(1);
+    prolunghe_serbatoio=EEPROM.read(2);
+    volume_min=EEPROM.read(3);*/
+    /*Serial.print("remoto: ");
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
     Serial.println(remoto);
     Serial.print("test: ");
     Serial.println(test);
@@ -106,12 +136,17 @@ void dispenserSetup() {
     Serial.print("volume_min: ");
     Serial.println(volume_min);
     Serial.print("prolunghe_serbatoio: ");
+<<<<<<< HEAD
     Serial.println(prolunghe_serbatoio);
+=======
+    Serial.println(prolunghe_serbatoio);*/
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
 }
 
 /* --- LOOP DEL DISPENSER (TUTTA LA TUA LOGICA) --- */
 void dispenserLoop() {
     //verifico i dati in EEPROM per aggiornare da remoto
+<<<<<<< HEAD
   if(remoto){
         EEPROM.get(0,test1);
         EEPROM.get(2,tipo_dispenser1);
@@ -124,6 +159,20 @@ void dispenserLoop() {
              }
     else {
          }
+=======
+  /* if(remoto){
+        if (test != EEPROM.read(0)) {EEPROM.write(0,test);}
+        if (tipo_dispenser != EEPROM.read(1)) {EEPROM.write(1,tipo_dispenser);}
+        if (prolunghe_serbatoio != EEPROM.read(2)) {EEPROM.write(2,prolunghe_serbatoio);}
+        if (volume_min != EEPROM.read(3)) {EEPROM.write(3,volume_min);}
+       
+            }
+    else {
+   
+
+
+    }*/
+>>>>>>> ca0ba671bf61672d6772308876bc6ff786f16f5c
     Vbatt=12000*analogRead(A3)/516;
     if (test==true)  {delay(12); }
     else {delay(1000);}
