@@ -6,8 +6,8 @@
 
 /*
 *   IoT Pet Food Dispenser - IIS "E. Alessandrini"
-*   v.1.0.2 - release
-*   12/05/2026
+*   v.1.0 - release
+*   16/04/2026
 */
 
 // impostiamo le variabili da passare con il nome della rete e la password
